@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0e14;
+  --color-panel: #141a24;
+  --color-panel-2: #1b2331;
+  --color-line: #263044;
+  --color-win: #2d6cdf;
+  --color-win-bg: #14233f;
+  --color-loss: #d1445b;
+  --color-loss-bg: #3a1c27;
+  --color-muted: #8a96ab;
+  --color-gold: #e4b955;
+}
+
+body {
+  background: var(--color-bg);
+  color: #e6eaf2;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
