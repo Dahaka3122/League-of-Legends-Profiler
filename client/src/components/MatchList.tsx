@@ -1,7 +1,8 @@
+import type { ReactNode } from "react";
 import type { MatchSummary } from "../types";
 import { MatchCard } from "./MatchCard";
 
-export function MatchList({ matches, version }: { matches: MatchSummary[]; version: string }) {
+export function MatchList({ matches, version, children }: { matches: MatchSummary[]; version: string; children?: ReactNode }) {
   const wins = matches.filter((m) => m.win).length;
 
   return (
@@ -24,6 +25,7 @@ export function MatchList({ matches, version }: { matches: MatchSummary[]; versi
           ))}
         </ul>
       )}
+      {children}
     </section>
   );
 }

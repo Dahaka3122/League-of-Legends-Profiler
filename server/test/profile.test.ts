@@ -298,7 +298,7 @@ describe("ProfileService", () => {
 
     await service.getProfile("euw1", "Tester", "EUW");
 
-    expect(riot.getMatchIds).toHaveBeenCalledWith("europe", "me", 10);
+    expect(riot.getMatchIds).toHaveBeenCalledWith("europe", "me", 10, 0);
   });
 
   it("serves repeat lookups from the cache (case-insensitive) without calling Riot again", async () => {
@@ -310,5 +310,44 @@ describe("ProfileService", () => {
 
     expect(riot.getAccountByRiotId).toHaveBeenCalledTimes(1);
     expect(riot.getMatch).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("ProfileService match pagination", () => {
+  it("fetches only the requested page, caches it, and does not fetch account details", async () => {
+    const riot = fakeRiot();
+    const service = new ProfileService(riot as unknown as RiotClient, new MemoryCache());
+    const page = await service.getMatchPage("eun1", "me", 10);
+    await service.getMatchPage("eun1", "me", 10);
+    expect(riot.getMatchIds).toHaveBeenCalledTimes(1);
+    expect(riot.getMatchIds).toHaveBeenCalledWith("europe", "me", 10, 10);
+    expect(riot.getMatch).toHaveBeenCalledTimes(3);
+    expect(riot.getAccountByRiotId).not.toHaveBeenCalled();
+    expect(page.nextStart).toBeNull();
+    expect(page.matches.map((m) => m.matchId)).toEqual(["B", "C", "A"]);
+  });
+  it("advances by IDs, stops at 100, and handles an empty history", async () => {
+    const riot = fakeRiot();
+    riot.getMatchIds.mockResolvedValue(Array(10).fill("A"));
+    const service = new ProfileService(riot as unknown as RiotClient, new MemoryCache());
+    expect((await service.getMatchPage("euw1", "me", 80)).nextStart).toBe(90);
+    expect((await service.getMatchPage("euw1", "me", 90)).nextStart).toBeNull();
+    // Cursor must advance even if a returned match lacks the requested participant.
+    expect((await service.getMatchPage("euw1", "other-player", 10))).toMatchObject({ matches: [], nextStart: 20 });
+    riot.getMatchIds.mockResolvedValue([]);
+    expect(await service.getMatchPage("euw1", "me", 20)).toEqual({ matches: [], nextStart: null });
+  });
+  it("does not cache a failed page and permits retry", async () => {
+    const riot = fakeRiot();
+    riot.getMatch.mockRejectedValueOnce(new Error("network"));
+    const service = new ProfileService(riot as unknown as RiotClient, new MemoryCache());
+    await expect(service.getMatchPage("euw1", "me", 10)).rejects.toThrow("network");
+    expect((await service.getMatchPage("euw1", "me", 10)).matches).toHaveLength(3);
+  });
+  it("rejects offsets outside the ten-page history", async () => {
+    const riot = fakeRiot();
+    const service = new ProfileService(riot as unknown as RiotClient, new MemoryCache());
+    for (const start of [-10, 100, 1, 1.5, NaN]) await expect(service.getMatchPage("euw1", "me", start)).rejects.toThrow("Invalid match offset");
+    expect(riot.getMatchIds).not.toHaveBeenCalled();
   });
 });

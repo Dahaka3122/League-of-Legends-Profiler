@@ -77,7 +77,12 @@ export interface TeamSummary {
   damage: number;
 }
 
-export interface Profile {
+export interface MatchPage {
+  matches: MatchSummary[];
+  nextStart: number | null;
+}
+
+export interface Profile extends MatchPage {
   region: string;
   gameName: string;
   tagLine: string;
@@ -86,7 +91,6 @@ export interface Profile {
   profileIconId: number;
   ranked: RankedInfo[];
   topMastery: MasteryInfo[];
-  matches: MatchSummary[];
 }
 
 export const REGIONS: { value: string; label: string }[] = [

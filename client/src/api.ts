@@ -1,4 +1,4 @@
-import type { Profile } from "./types";
+import type { MatchPage, Profile } from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -12,7 +12,15 @@ export class ApiError extends Error {
 
 export async function fetchProfile(region: string, name: string, tag: string): Promise<Profile> {
   const url = `/api/profile/${encodeURIComponent(region)}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
-  const res = await fetch(url);
+  return request<Profile>(url);
+}
+
+export function fetchMatches(region: string, puuid: string, start: number, signal?: AbortSignal): Promise<MatchPage> {
+  return request<MatchPage>(`/api/matches/${encodeURIComponent(region)}/${encodeURIComponent(puuid)}?start=${start}`, signal);
+}
+
+async function request<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const res = await (signal ? fetch(url, { signal }) : fetch(url));
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     try {
@@ -23,7 +31,7 @@ export async function fetchProfile(region: string, name: string, tag: string): P
     }
     throw new ApiError(res.status, message);
   }
-  return (await res.json()) as Profile;
+  return (await res.json()) as T;
 }
 
 /** Parses "Name#TAG" (what players copy from the client). */

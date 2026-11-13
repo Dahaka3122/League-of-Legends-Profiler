@@ -79,7 +79,12 @@ export interface TeamSummary {
   damage: number;
 }
 
-export interface Profile {
+export interface MatchPage {
+  matches: MatchSummary[];
+  nextStart: number | null;
+}
+
+export interface Profile extends MatchPage {
   region: Platform;
   gameName: string;
   tagLine: string;
@@ -88,7 +93,6 @@ export interface Profile {
   profileIconId: number;
   ranked: RankedInfo[];
   topMastery: MasteryInfo[];
-  matches: MatchSummary[];
 }
 
 const PROFILE_TTL_MS = 2 * 60_000;
@@ -204,22 +208,39 @@ export class ProfileService {
     private readonly cache: Cache,
   ) {}
 
+  async getMatchPage(platform: Platform, puuid: string, start = 0): Promise<MatchPage> {
+    if (!Number.isInteger(start) || start < 0 || start > 90 || start % 10 !== 0) {
+      throw new RangeError("Invalid match offset");
+    }
+    const key = `matches:${platform}:${puuid}:${start}`;
+    const cached = await this.cache.get<MatchPage>(key);
+    if (cached) return cached;
+    const host = regionalHostFor(platform);
+    const ids = await this.riot.getMatchIds(host, puuid, 10, start);
+    const matches = await Promise.all(ids.map((id) => this.riot.getMatch(host, id)));
+    const page: MatchPage = {
+      matches: matches.map((match) => summarizeMatch(match, puuid))
+        .filter((match): match is MatchSummary => match !== undefined)
+        .sort((a, b) => b.playedAt - a.playedAt),
+      nextStart: ids.length < 10 || start + 10 >= 100 ? null : start + 10,
+    };
+    await this.cache.set(key, page, PROFILE_TTL_MS);
+    return page;
+  }
+
   async getProfile(platform: Platform, gameName: string, tagLine: string): Promise<Profile> {
     const key = `profile:${platform}:${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
     const cached = await this.cache.get<Profile>(key);
     if (cached) return cached;
 
-    const host = regionalHostFor(platform);
     const account = await this.riot.getAccountByRiotId(platform, gameName, tagLine);
 
-    const [summoner, entries, mastery, matchIds] = await Promise.all([
+    const [summoner, entries, mastery, page] = await Promise.all([
       this.riot.getSummonerByPuuid(platform, account.puuid),
       this.riot.getRankedEntries(platform, account.puuid),
       this.riot.getTopMastery(platform, account.puuid, 3),
-      this.riot.getMatchIds(host, account.puuid, 10),
+      this.getMatchPage(platform, account.puuid),
     ]);
-
-    const matches = await Promise.all(matchIds.map((id) => this.riot.getMatch(host, id)));
 
     const ranked: RankedInfo[] = entries.flatMap((e) => {
       const queue = e.queueType === "RANKED_SOLO_5x5" ? "SOLO" : e.queueType === "RANKED_FLEX_SR" ? "FLEX" : undefined;
@@ -249,10 +270,7 @@ export class ProfileService {
         level: m.championLevel,
         points: m.championPoints,
       })),
-      matches: matches
-        .map((m) => summarizeMatch(m, account.puuid))
-        .filter((m): m is MatchSummary => m !== undefined)
-        .sort((a, b) => b.playedAt - a.playedAt),
+      ...page,
     };
 
     await this.cache.set(key, profile, PROFILE_TTL_MS);

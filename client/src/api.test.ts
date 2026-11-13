@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, fetchProfile, parseRiotId } from "./api";
+import { ApiError, fetchMatches, fetchProfile, parseRiotId } from "./api";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -52,4 +52,13 @@ describe("fetchProfile", () => {
 
     expect((err as ApiError).message).toBe("Request failed (502)");
   });
+});
+
+it("requests a match page with its offset and cancellation signal", async () => {
+  const body = { matches: [], nextStart: 20 };
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(body)));
+  vi.stubGlobal("fetch", fetchMock);
+  const signal = new AbortController().signal;
+  expect(await fetchMatches("euw1", "player", 10, signal)).toEqual(body);
+  expect(fetchMock).toHaveBeenCalledWith("/api/matches/euw1/player?start=10", { signal });
 });

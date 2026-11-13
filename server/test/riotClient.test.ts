@@ -103,3 +103,9 @@ describe("RiotClient", () => {
     expect((err as RiotApiError).status).toBe(502);
   });
 });
+
+it("requests ten match IDs at the specified offset", async () => {
+  const { client, fetchImpl } = setup([jsonResponse(["EUW1_1"])]);
+  await client.getMatchIds("europe", "player", 10, 90);
+  expect(fetchImpl.mock.calls[0]?.[0]).toBe("https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/player/ids?start=90&count=10");
+});

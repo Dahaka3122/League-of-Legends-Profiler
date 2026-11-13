@@ -13,6 +13,7 @@ const sampleProfile: Profile = {
   ranked: [],
   topMastery: [],
   matches: [],
+  nextStart: null,
 };
 
 function appWith(getProfile: ReturnType<typeof vi.fn>) {
@@ -86,5 +87,31 @@ describe("GET /api/health", () => {
   it("responds ok", async () => {
     const res = await appWith(vi.fn()).inject({ method: "GET", url: "/api/health" });
     expect(res.json()).toEqual({ ok: true });
+  });
+});
+
+describe("GET /api/matches/:region/:puuid", () => {
+  it("passes a validated offset and player to the service", async () => {
+    const getMatchPage = vi.fn().mockResolvedValue({ matches: [], nextStart: 20 });
+    const app = buildApp({ getProfile: vi.fn(), getMatchPage });
+    const res = await app.inject({ method: "GET", url: "/api/matches/eun1/player-1?start=10" });
+    expect(res.statusCode).toBe(200);
+    expect(getMatchPage).toHaveBeenCalledWith("eun1", "player-1", 10);
+    expect(res.json().nextStart).toBe(20);
+    await app.close();
+  });
+  it("rejects invalid offsets and regions without upstream calls", async () => {
+    const getMatchPage = vi.fn();
+    const app = buildApp({ getProfile: vi.fn(), getMatchPage });
+    for (const url of ["/api/matches/mars/p?start=10", ...["-10", "100", "999", "1", "1.5", "abc", ""].map((start) => `/api/matches/euw1/p?start=${start}`), "/api/matches/euw1/p"]) {
+      expect((await app.inject({ method: "GET", url })).statusCode).toBe(400);
+    }
+    expect(getMatchPage).not.toHaveBeenCalled();
+    await app.close();
+  });
+  it("maps upstream failures on additional pages", async () => {
+    const app = buildApp({ getProfile: vi.fn(), getMatchPage: vi.fn().mockRejectedValue(new RiotApiError(429, "limit")) });
+    expect((await app.inject({ method: "GET", url: "/api/matches/euw1/p?start=10" })).statusCode).toBe(429);
+    await app.close();
   });
 });

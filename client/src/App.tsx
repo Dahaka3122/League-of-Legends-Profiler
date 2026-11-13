@@ -1,10 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { fetchProfile } from "./api";
-import { MasteryList } from "./components/MasteryList";
-import { MatchList } from "./components/MatchList";
+import { ProfileMatches } from "./components/ProfileMatches";
 import { ProfileHeader } from "./components/ProfileHeader";
-import { RankedCard } from "./components/RankedCard";
 import { SearchBar } from "./components/SearchBar";
 import { useDDragon } from "./ddragon";
 
@@ -44,13 +42,7 @@ export function App() {
       {profile && (
         <main className="flex flex-col gap-6">
           <ProfileHeader profile={profile} version={dd.version} />
-          <div className="grid gap-6 md:grid-cols-[18rem_1fr]">
-            <div className="flex flex-col gap-6">
-              <RankedCard ranked={profile.ranked} />
-              <MasteryList mastery={profile.topMastery} dd={dd} />
-            </div>
-            <MatchList matches={profile.matches} version={dd.version} />
-          </div>
+          <ProfileMatches key={`${profile.region}:${profile.puuid}`} profile={profile} dd={dd} />
         </main>
       )}
 

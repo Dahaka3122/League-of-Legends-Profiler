@@ -74,8 +74,8 @@ export class RiotClient {
     return this.request(platformUrl(platform) + path, z.array(masterySchema));
   }
 
-  getMatchIds(host: RegionalHost, puuid: string, count = 10): Promise<string[]> {
-    const path = `/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?start=0&count=${count}`;
+  getMatchIds(host: RegionalHost, puuid: string, count = 10, start = 0): Promise<string[]> {
+    const path = `/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?start=${start}&count=${count}`;
     return this.request(regionalUrl(host) + path, z.array(z.string()));
   }
 
